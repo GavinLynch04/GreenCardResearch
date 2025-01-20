@@ -121,7 +121,8 @@ def preprocess():
     # Prepare data for training
     X = df_combined.drop(columns=['MONTHS_TO_DECISION', 'WAITING_TIME', 'DECISION_DATE', 'CASE_RECEIVED_DATE', 'CHINA_DATE', 'INDIA_DATE','MEXICO_DATE','PHILIPPINES_DATE','ALL_DATE', 'WAITING_TIME_RANGE'])
     cat_var = ['NAICS', 'PW_LEVEL_9089', 'JOB_INFO_WORK_STATE', 'COUNTRY_OF_CITIZENSHIP', 'FOREIGN_WORKER_INFO_EDUCATION', 'JOB_INFO_EXPERIENCE', 'CLASS_OF_ADMISSION', 'JOB_INFO_EDUCATION', 'JOB_INFO_TRAINING', 'JOB_INFO_FOREIGN_ED', 'RI_LAYOFF_IN_PAST_SIX_MONTHS', 'FW_INFO_REQ_EXPERIENCE']
-    X_encoded = pd.get_dummies(X, columns=cat_var)
+    #X_encoded = pd.get_dummies(X, columns=cat_var)
 
-    return X_encoded, y
+
+    return X, y, cat_var
 
