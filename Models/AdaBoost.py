@@ -19,10 +19,11 @@ ada = bestAda.fit(train_X, train_y)
 stop = time.time()
 print(f"Training time: {stop - start}s")
 
-mapie = MapieRegressor(estimator=bestAda, method="quantile", alpha=0.1)  # 90% confidence interval
+mapie = MapieRegressor(estimator=bestAda, n_jobs=-1)  # 90% confidence interval
 mapie.fit(train_X, train_y)
-y_pred, y_pis = mapie.predict(test_X, return_prediction_intervals=True)
-
+test_X = test_X[:1000]  # Use only 1,000 samples
+test_y = test_y[:1000]
+y_pred, y_pis = mapie.predict(test_X, alpha=0.1)
 
 correct = (test_y >= y_pis[:, 0]) & (test_y <= y_pis[:, 1])  # True if within the interval
 accuracy = np.mean(correct)
