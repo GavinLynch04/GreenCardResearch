@@ -15,7 +15,7 @@ st.divider()
 st.write('Upload your own file or use the following form to get started.')
 
 # Reading the pickle file that we created before
-ada_pickle = open('Models/adaboost_model.pkl','rb')
+ada_pickle = open('Streamlit/pages/adaboost_model.pkl','rb')
 ada = pickle.load(ada_pickle)
 ada_pickle.close()
 
@@ -50,7 +50,7 @@ with st.form('user_inputs'):
     'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia', 'Wisconsin', 'Wyoming'
   ]
   us_states_uppercase = [state.upper() for state in us_states]
-  JOB_INFO_WORK_STATE = st.selectbox('Employer State',options=['ALABAMA', 'ALASKA', 'ARIZONA', 'ARKANSAS', 'CALIFORNIA', 'COLORADO', 'CONNECTICUT', 'DELAWARE', 'DISTRICT OF COLUMBIA', 'FLORIDA', 'GEORGIA', 'GUAM', 'HAWAII', 'IDAHO', 'ILLINOIS', 'INDIANA', 'IOWA', 'KANSAS', 'KENTUCKY', 'LOUISIANA', 'MAINE', 'MARYLAND', 'MASSACHUSETTES', 'MASSACHUSETTS', 'MH', 'MICHIGAN', 'MINNESOTA', 'MISSISSIPPI', 'MISSOURI', 'MONTANA', 'NEBRASKA', 'NEVADA', 'NEW HAMPSHIRE', 'NEW JERSEY', 'NEW MEXICO', 'NEW YORK', 'NORTH CAROLINA', 'NORTH DAKOTA', 'NORTHERN MARIANA ISLANDS', 'OHIO', 'OKLAHOMA', 'OREGON', 'PENNSYLVANIA', 'PUERTO RICO', 'RHODE ISLAND', 'SOUTH CAROLINA', 'SOUTH DAKOTA', 'TENNESSEE', 'TEXAS', 'UTAH', 'VERMONT', 'VIRGIN ISLANDS', 'VIRGINIA', 'WASHINGTON', 'WEST VIRGINIA', 'WISCONSIN', 'WYOMING'])
+  JOB_INFO_WORK_STATE = st.selectbox('Employer State',options=['ALABAMA', 'ALASKA', 'ARIZONA', 'ARKANSAS', 'CALIFORNIA', 'COLORADO', 'CONNECTICUT', 'DELAWARE', 'DISTRICT OF COLUMBIA', 'FLORIDA', 'GEORGIA', 'GUAM', 'HAWAII', 'IDAHO', 'ILLINOIS', 'INDIANA', 'IOWA', 'KANSAS', 'KENTUCKY', 'LOUISIANA', 'MAINE', 'MARYLAND', 'MASSACHUSETTS', 'MASSACHUSETTS', 'MH', 'MICHIGAN', 'MINNESOTA', 'MISSISSIPPI', 'MISSOURI', 'MONTANA', 'NEBRASKA', 'NEVADA', 'NEW HAMPSHIRE', 'NEW JERSEY', 'NEW MEXICO', 'NEW YORK', 'NORTH CAROLINA', 'NORTH DAKOTA', 'NORTHERN MARIANA ISLANDS', 'OHIO', 'OKLAHOMA', 'OREGON', 'PENNSYLVANIA', 'PUERTO RICO', 'RHODE ISLAND', 'SOUTH CAROLINA', 'SOUTH DAKOTA', 'TENNESSEE', 'TEXAS', 'UTAH', 'VERMONT', 'VIRGIN ISLANDS', 'VIRGINIA', 'WASHINGTON', 'WEST VIRGINIA', 'WISCONSIN', 'WYOMING'])
   PW_LEVEL_9089 = st.selectbox('Prevailing Wage Level',options=['Level I','Level II','Level III','Level IV'])
   PW_AMOUNT_9089 = st.number_input("Prevailing Wage Amount (Annual salary)",min_value=0)
   NAICS = st.selectbox('Employer NAICS Code (If unknown, refer to FAQs page for NAICS Code table.)',options=['11','21','22','23','31','32','33','42','44','45','48','49','51','52','53',
@@ -181,21 +181,39 @@ if immigration_file is None and submit:
   st.subheader("Predicted Waiting Time")
 
   if ml_model == 'AdaBoost':
-      print("Running Explainer")
-      explainer = shap.KernelExplainer(ada.predict, original_df_encoded1)
-      joblib.dump(explainer, 'shap_explainer.pkl')
+      def decimal_to_years_months(decimal_years):
+          years = int(decimal_years)  # Extract the whole number of years
+          months = round((decimal_years - years) * 12)  # Convert remaining fraction to months
+          if months == 12:
+              return years + 1, 0
+          return years, months
 
-      shap_values = explainer.shap_values(input_df_encoded1)
+      mapie_pickle = open('Streamlit/pages/mapie.pkl', 'rb')
+      mapie = pickle.load(mapie_pickle)
+      mapie_pickle.close()
 
       # For regression, you would use the prediction directly
       new_prediction3 = ada.predict(input_df_encoded1)[0] if ada.predict(input_df_encoded1) else 'No prediction'
+      y_pred, y_pis = mapie.predict(input_df_encoded1, alpha=0.1)
+
+      if y_pis[0,0,0] <= 0:
+          low_year, low_month = 0, 0
+      else:
+          low_year, low_month = decimal_to_years_months(y_pis[0,0,0])
+      high_year, high_month = decimal_to_years_months(y_pis[0,1,0])
 
       # Display the prediction value
       prediction_text = (
           f'<span style="color:red; font-weight: bold;">{new_prediction3}</span> '
-          f'prediction value.')
+          f'prediction value. Our model predicts with 90% confidence that your waiting time will be between {low_year} year(s), {low_month} month(s) and {high_year} year(s), {high_month} month(s).')
 
       st.markdown(prediction_text, unsafe_allow_html=True)
+
+      shap_pickle = open('Streamlit/pages/shap.pkl', 'rb')
+      shapmodel = pickle.load(shap_pickle)
+      shap_pickle.close()
+      print("Loaded Explainer")
+      shap_values = shapmodel.shap_values(input_df_encoded1)
 
       # Display the SHAP values and feature analysis
       st.subheader('SHAP Feature Analysis')
@@ -212,15 +230,41 @@ if immigration_file is None and submit:
           "- Cumulative Impact: The cumulative effect of feature contributions leads to the final predicted value.")
       st.markdown(
           "- Interpretation by Features: Each waterfall plot is specific to a sample, showing how features influence the model's prediction for that specific value.")
+      # Identify country-related features
+      country_columns = [col for col in input_df_encoded1.columns if col.startswith("COUNTRY_OF_CITIZENSHIP_")]
+      state_columns = [col for col in input_df_encoded1.columns if col.startswith("JOB_INFO_WORK_STATE_")]
 
+      # Sum SHAP values for all country-related columns
+      country_shap_score = sum(shap_values[0][input_df_encoded1.columns.get_loc(col)] for col in country_columns)
+      state_shap_score = sum(shap_values[0][input_df_encoded1.columns.get_loc(col)] for col in state_columns)
+
+      # Create a new feature list excluding individual country columns
+      filtered_feature_names = ([col for col in input_df_encoded1.columns if col not in country_columns and col not in state_columns] +
+                                ["COUNTRY_OF_CITIZENSHIP_TOTAL"] + ["JOB_INFO_WORK_STATE_TOTAL"])
+
+      # Create new data and SHAP values arrays
+      filtered_shap_values = np.array(
+          [shap_values[0][input_df_encoded1.columns.get_loc(col)] for col in filtered_feature_names if
+           col != "COUNTRY_OF_CITIZENSHIP_TOTAL" and col != "JOB_INFO_WORK_STATE_TOTAL"] + [country_shap_score] + [state_shap_score])
+      filtered_data = np.array([input_df_encoded1.iloc[0][col] for col in filtered_feature_names if
+                                col != "COUNTRY_OF_CITIZENSHIP_TOTAL" and col != "JOB_INFO_WORK_STATE_TOTAL"] + [
+                                   sum(input_df_encoded1.iloc[0][col] for col in country_columns)] + [
+                                   sum(input_df_encoded1.iloc[0][col] for col in state_columns)])
+
+      # Create a new SHAP Explanation object
+      expl = shap.Explanation(
+          values=filtered_shap_values,
+          base_values=shapmodel.expected_value,
+          data=filtered_data,
+          feature_names=filtered_feature_names
+      )
+
+      # Display the waterfall plot
       tab = st.empty()
       with tab:
-          expl = shap.Explanation(values=shap_values[0],
-                                  base_values=explainer.expected_value,
-                                  data=input_df_encoded1.iloc[0],
-                                  feature_names=input_df_encoded1.columns)
           shap.plots.waterfall(expl, show=False)
           st.pyplot()
+
 
 
 elif submit:
@@ -268,9 +312,6 @@ elif submit:
     original_df_encoded1 = combined_df_encoded1[:original_rows1]
     input_df_encoded1 = combined_df_encoded1.tail(1)
 
-    print(input_df_encoded1)
-    print(input_df_encoded1.head())
-    print(input_df_encoded1.columns)
     # Using predict() with new data provided by the user
     new_prediction3 = ada.predict(input_df_encoded1)
 

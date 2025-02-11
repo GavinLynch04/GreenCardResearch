@@ -18,17 +18,16 @@ print(y)
 train_X, test_X, train_y, test_y = train_test_split(X, y, test_size=0.25, random_state=207)
 
 bestAda = AdaBoostRegressor(estimator =  DecisionTreeRegressor(max_depth=68, min_samples_leaf=2, min_samples_split=13, random_state=9), n_estimators=50, learning_rate=0.01, random_state = 9)
-
+'''
 start = time.time()
 ada = bestAda.fit(train_X, train_y)
 stop = time.time()
-print(f"Training time: {stop - start}s")
+print(f"Training time: {stop - start}s")'''
 
-with open("adaboost_model.pkl", "wb") as file:
-    pickle.dump(ada, file)
+shap_pickle = open('../Streamlit/pages/adaboost_model.pkl', 'rb')
+ada = pickle.load(shap_pickle)
+shap_pickle.close()
 
-with open("adaboost_model.pickle", "wb") as file:
-    pickle.dump(ada, file)
 
 '''
 explainer = LimeTabularExplainer(
@@ -48,8 +47,10 @@ explanation = explainer.explain_instance(instance, ada.predict)
 html = explanation.as_html()
 with open("lime_explanation.html", "w") as f:
     f.write(html)'''
-'''mapie = MapieRegressor(estimator=bestAda, n_jobs=-1)  # 90% confidence interval
+mapie = MapieRegressor(estimator=ada, n_jobs=-1)  # 90% confidence interval
 mapie.fit(train_X, train_y)
+with open("../Streamlit/pages/mapie.pkl", "wb") as file:
+    pickle.dump(mapie, file)
 test_X = test_X[:1000]  # Use only 1,000 samples
 test_y = test_y[:1000]
 y_pred, y_pis = mapie.predict(test_X, alpha=0.1)
@@ -69,7 +70,7 @@ recall = recall_score(binary_y_true, binary_y_pred)
 # Display the results
 print(f"Custom Accuracy (within 90% confidence): {accuracy:.2f}")
 print(f"Custom Precision: {precision:.2f}")
-print(f"Custom Recall: {recall:.2f}")'''
+print(f"Custom Recall: {recall:.2f}")
 '''
 import matplotlib.pyplot as plt
 import numpy as np
