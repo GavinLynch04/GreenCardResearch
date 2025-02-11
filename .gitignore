@@ -1,2 +1,14 @@
 Data Sets/
 ML Results/
+# Ignore all CSV files
+*.csv
+
+# Ignore all pickle files
+*.pkl
+*.pickle
+
+*.png
+*.svg
+*.jpg
+*.xlsx
+*.tsv
