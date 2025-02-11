@@ -10,6 +10,26 @@ from sklearn.preprocessing import LabelEncoder
 import warnings
 warnings.filterwarnings('ignore')
 
+def decimal_to_years_months(decimal_years):
+    years = int(decimal_years)  # Extract the whole number of years
+    months = round((decimal_years - years) * 12)  # Convert remaining fraction to months
+    if months == 12:
+        return str(years + 1) + " years", "0 months"
+    elif months == 1 and years == 1:
+        months = str(months) + " month"
+        years = str(years) + " year"
+    elif years == 1 and months != 1:
+        years = str(years) + " year"
+        months = str(months) + " months"
+    elif years != 1 and months == 1:
+        years = str(years) + " years"
+        months = str(months) + " month"
+    else:
+        months = str(months) + " months"
+        years = str(years) + " years"
+
+    return years, months
+
 st.title('Machine Learning Application')
 st.divider()
 st.write('Upload your own file or use the following form to get started.')
@@ -18,8 +38,6 @@ st.write('Upload your own file or use the following form to get started.')
 ada_pickle = open('Streamlit/pages/adaboost_model.pkl','rb')
 ada = pickle.load(ada_pickle)
 ada_pickle.close()
-
-
 
 # Option 1: Asking users to input their data as a file
 immigration_file = st.file_uploader('Upload your own application data in csv format.')
@@ -32,7 +50,6 @@ st.write("Please ensure that your data adheres to this specific format:")
 @st.cache_data
 def load_data(filename):
   df = pd.read_csv(filename)
-  #df['NAICS'] = df['NAICS'].astype(str)
   return df
 
 data_format = load_data('Data/Data Sets/fullData.csv')
@@ -157,10 +174,6 @@ if immigration_file is None and submit:
   original_df_encoded1 = combined_df_encoded1[:original_rows1]
   input_df_encoded1 = combined_df_encoded1.tail(1)
 
-  print(input_df_encoded1)
-  print(input_df_encoded1.head())
-  print(input_df_encoded1.columns)
-
   # Using predict() with new data provided by the user
   new_prediction3 = ada.predict(input_df_encoded1)
 
@@ -181,13 +194,6 @@ if immigration_file is None and submit:
   st.subheader("Predicted Waiting Time")
 
   if ml_model == 'AdaBoost':
-      def decimal_to_years_months(decimal_years):
-          years = int(decimal_years)  # Extract the whole number of years
-          months = round((decimal_years - years) * 12)  # Convert remaining fraction to months
-          if months == 12:
-              return years + 1, 0
-          return years, months
-
       mapie_pickle = open('Streamlit/pages/mapie.pkl', 'rb')
       mapie = pickle.load(mapie_pickle)
       mapie_pickle.close()
@@ -197,15 +203,14 @@ if immigration_file is None and submit:
       y_pred, y_pis = mapie.predict(input_df_encoded1, alpha=0.1)
 
       if y_pis[0,0,0] <= 0:
-          low_year, low_month = 0, 0
+          low_year, low_month = "0 years", "0 months"
       else:
           low_year, low_month = decimal_to_years_months(y_pis[0,0,0])
       high_year, high_month = decimal_to_years_months(y_pis[0,1,0])
 
       # Display the prediction value
       prediction_text = (
-          f'<span style="color:red; font-weight: bold;">{new_prediction3}</span> '
-          f'prediction value. Our model predicts with 90% confidence that your waiting time will be between {low_year} year(s), {low_month} month(s) and {high_year} year(s), {high_month} month(s).')
+          f'Our model predicts with 90% confidence that your waiting time will be between {low_year}, {low_month} and {high_year}, {high_month}.')
 
       st.markdown(prediction_text, unsafe_allow_html=True)
 
