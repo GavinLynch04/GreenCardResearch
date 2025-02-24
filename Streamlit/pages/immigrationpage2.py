@@ -14,8 +14,9 @@ st.markdown("- The majority of wait times were grouped in either the **0-2.5 yea
 st.markdown("- More than half of the dataset is for applicants whose country of citizenship is **India**.")
 st.markdown("- The top 5 countries with the most data are **India, China, Canada, South Korea,** and **Mexico**.")
 
-st.image('PIEE2.png')
-st.image('PIEE.png')
+
+st.image('Streamlit/PIEE2.png')
+st.image('Streamlit/PIEE.png')
 
 st.header('Analysis of Features Impacting Waiting Times')
 st.markdown('An analysis of the dataset was performed to identify major factors influencing visa wait times. Observed trends are as follows:')
@@ -25,7 +26,7 @@ st.markdown("- Foreign workers with **more education** up to a Master's Degree h
 st.markdown("- Applicants with employers who **required job experience** had **higher average wait times** than those that did not.")
 st.markdown("- ")
 
-st.image('average_waiting_time_map.svg')
-st.image('PWlevel.svg')
-st.image('eduworker.svg')
-st.image('experience.svg')
+st.image('Streamlit/average_waiting_time_map.svg')
+st.image('Streamlit/PWlevel.svg')
+st.image('Streamlit/eduworker.svg')
+st.image('Streamlit/experience.svg')

@@ -11,7 +11,7 @@ st.title('ML Model Performance')
 st.divider()
 
 st.subheader('Model Peformance Comparison')
-results = pd.read_csv('model_f1_scores.csv', index_col=0)
+results = pd.read_csv('Streamlit/model_f1_scores.csv', index_col=0)
 max_f1_index = results['f-1 Score Macro Average'].idxmax()
 min_f1_index = results['f-1 Score Macro Average'].idxmin()
 
@@ -30,9 +30,9 @@ tab_one,tab_two,tab_three,tab_four = st.tabs(['Decision Tree','Random Forest','A
 with tab_one:
       tab3, tab4, tab5, tab6 = st.tabs(["Confusion Matrix (Train)","Confusion Matrix (Test)", "Classification Report (Train)", "Classification Report (Test)"])
       with tab3:
-        st.image('dt_train_cm.png')
+        st.image('Streamlit/dt_train_cm.png')
       with tab4:
-        st.image('dt_test_cm.png')
+        st.image('Streamlit/dt_test_cm.png')
       with tab5:
         df_train_class_report = pd.read_csv("df_train_class_report.csv", index_col=0)
         st.dataframe(df_train_class_report)

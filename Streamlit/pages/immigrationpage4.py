@@ -5,7 +5,7 @@ import numpy as np
 import warnings
 warnings.filterwarnings('ignore')
 
-df_naics = pd.read_excel('naics.xlsx')
+df_naics = pd.read_excel('Streamlit/naics.xlsx')
 
 st.title('Frequently Asked Questions')
 st.divider()
