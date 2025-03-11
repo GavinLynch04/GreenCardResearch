@@ -5,6 +5,7 @@ import pickle
 import shap
 import warnings
 
+from matplotlib import pyplot as plt
 
 warnings.filterwarnings('ignore')
 
@@ -40,7 +41,7 @@ def decimal_to_years_months(decimal_years):
 # --------------------
 # Page Functions
 # --------------------
-def job_info_page():
+def job_info_page1():
     st.title("Job/Employer Information")
     JOB_INFO_WORK_STATE = st.selectbox('Employer State',
                                        options=['ALABAMA', 'ALASKA', 'ARIZONA', 'ARKANSAS', 'CALIFORNIA', 'COLORADO',
@@ -63,6 +64,23 @@ def job_info_page():
     JOB_INFO_EDUCATION = st.selectbox('Education level required by job:',
                                       options=["Master's", "Bachelor's", 'Doctorate', 'Other', 'High School',
                                                "Associate's"])
+
+    if st.button("Next: Continue to Job Info"):
+        # Store job info in session state
+        st.session_state.job_info = {
+            "JOB_INFO_WORK_STATE": JOB_INFO_WORK_STATE,
+            "PW_LEVEL_9089": PW_LEVEL_9089,
+            "PW_AMOUNT_9089": PW_AMOUNT_9089,
+            "NAICS": NAICS,
+            "JOB_INFO_EDUCATION": JOB_INFO_EDUCATION,
+        }
+        st.session_state.page = "job_info2"
+        st.rerun()
+
+
+def job_info_page2():
+    st.title("Job/Employer Information")
+
     JOB_INFO_EXPERIENCE = st.radio('Job experience required?', options=['Y', 'N'])
     JOB_INFO_EXPERIENCE_NUM_MONTHS = st.number_input(
         "If experience is required, how many months? If none is required, enter '0'.", min_value=0)
@@ -75,22 +93,16 @@ def job_info_page():
 
     if st.button("Next: Continue to User Info"):
         # Store job info in session state
-        st.session_state.job_info = {
-            "JOB_INFO_WORK_STATE": JOB_INFO_WORK_STATE,
-            "PW_LEVEL_9089": PW_LEVEL_9089,
-            "PW_AMOUNT_9089": PW_AMOUNT_9089,
-            "NAICS": NAICS,
-            "JOB_INFO_EDUCATION": JOB_INFO_EDUCATION,
+        st.session_state.job_info.update({
             "JOB_INFO_EXPERIENCE": JOB_INFO_EXPERIENCE,
             "JOB_INFO_EXPERIENCE_NUM_MONTHS": JOB_INFO_EXPERIENCE_NUM_MONTHS,
             "JOB_INFO_TRAINING": JOB_INFO_TRAINING,
             "JOB_INFO_FOREIGN_ED": JOB_INFO_FOREIGN_ED,
             "RI_LAYOFF_IN_PAST_SIX_MONTHS": RI_LAYOFF_IN_PAST_SIX_MONTHS,
             "EMPLOYER_NUM_EMPLOYEES": EMPLOYER_NUM_EMPLOYEES,
-        }
+        })
         st.session_state.page = "user_info"
         st.rerun()
-
 
 def user_info_page():
     st.title("User Information")
@@ -152,105 +164,167 @@ def user_info_page():
 
 def prediction_page():
     st.title("Prediction Results")
-    with st.spinner('Analyzing features... Please wait'):
-        ada, mapie, shap_model = load_models()
+    ada, mapie, shap_model = load_models()
 
-        original_df = pd.read_csv('Data/Data Sets/fullData.csv')  # Original data to create ML model
-        original_df.rename(columns={'2_NAICS': 'NAICS'}, inplace=True)
-        original_df['NAICS'] = original_df['NAICS'].astype(str)
-        original_df['JOB_INFO_WORK_STATE'].replace({'MASSACHUSETTES': 'MASSACHUSETTS', 'MH': 'MARSHALL ISLANDS'},
-                                                   inplace=True)
-        original_df['COUNTRY_OF_CITIZENSHIP'].replace(
-            {'IVORY COAST': "COTE d'IVOIRE", 'NETHERLANDS ANTILLES': 'NETHERLANDS'},
-            inplace=True)
-        original_df = original_df[~original_df['COUNTRY_OF_CITIZENSHIP'].isin(
-            ['SOVIET UNION', 'UNITED STATES OF AMERICA', 'KIRIBATI', 'SAO TOME AND PRINCIPE', 'SINT MAARTEN'])]
-        original_df = original_df[
-            ~original_df['JOB_INFO_WORK_STATE'].isin(['FEDERATED STATES OF MICRONESIA', 'MARSHALL ISLANDS'])]
-        original_df.dropna(axis=0, how='any', inplace=True)
-        original_df.drop(['DECISION_DATE', 'PW_UNIT_OF_PAY_9089', 'CASE_RECEIVED_DATE'], axis=1, inplace=True)
+    if 'prediction' not in st.session_state:
+        with st.spinner("Predicting..."):
+            original_df = pd.read_csv('Data/Data Sets/fullData.csv')  # Original data to create ML model
+            original_df.rename(columns={'2_NAICS': 'NAICS'}, inplace=True)
+            original_df['NAICS'] = original_df['NAICS'].astype(str)
+            original_df['JOB_INFO_WORK_STATE'].replace({'MASSACHUSETTES': 'MASSACHUSETTS', 'MH': 'MARSHALL ISLANDS'},
+                                                       inplace=True)
+            original_df['COUNTRY_OF_CITIZENSHIP'].replace(
+                {'IVORY COAST': "COTE d'IVOIRE", 'NETHERLANDS ANTILLES': 'NETHERLANDS'},
+                inplace=True)
+            original_df = original_df[~original_df['COUNTRY_OF_CITIZENSHIP'].isin(
+                ['SOVIET UNION', 'UNITED STATES OF AMERICA', 'KIRIBATI', 'SAO TOME AND PRINCIPE', 'SINT MAARTEN'])]
+            original_df = original_df[
+                ~original_df['JOB_INFO_WORK_STATE'].isin(['FEDERATED STATES OF MICRONESIA', 'MARSHALL ISLANDS'])]
+            original_df.dropna(axis=0, how='any', inplace=True)
+            original_df.drop(['DECISION_DATE', 'PW_UNIT_OF_PAY_9089', 'CASE_RECEIVED_DATE'], axis=1, inplace=True)
 
-        # Concatenate two dataframes together along rows (axis = 0)
-        combined_df1 = original_df.copy()
+            # Concatenate two dataframes together along rows (axis = 0)
+            combined_df1 = original_df.copy()
 
-        # Define the new row as a dictionary to ensure it matches the column names
-        new_row = {
-            'NAICS': st.session_state.job_info.get("NAICS"),
-            'PW_LEVEL_9089': st.session_state.job_info.get("PW_LEVEL_9089"),
-            'PW_AMOUNT_9089': st.session_state.job_info.get("PW_AMOUNT_9089"),
-            'JOB_INFO_WORK_STATE': st.session_state.job_info.get("JOB_INFO_WORK_STATE"),
-            'COUNTRY_OF_CITIZENSHIP': st.session_state.user_info.get("COUNTRY_OF_CITIZENSHIP"),
-            'CLASS_OF_ADMISSION': st.session_state.user_info.get("CLASS_OF_ADMISSION"),
-            'EMPLOYER_NUM_EMPLOYEES': st.session_state.job_info.get("EMPLOYER_NUM_EMPLOYEES"),
-            'JOB_INFO_EDUCATION': st.session_state.job_info.get("JOB_INFO_EDUCATION"),
-            'JOB_INFO_TRAINING': st.session_state.job_info.get("JOB_INFO_TRAINING"),
-            'JOB_INFO_EXPERIENCE': st.session_state.job_info.get("JOB_INFO_EXPERIENCE"),
-            'JOB_INFO_EXPERIENCE_NUM_MONTHS': st.session_state.job_info.get("JOB_INFO_EXPERIENCE_NUM_MONTHS"),
-            'JOB_INFO_FOREIGN_ED': st.session_state.job_info.get("JOB_INFO_FOREIGN_ED"),
-            'RI_LAYOFF_IN_PAST_SIX_MONTHS': st.session_state.job_info.get("RI_LAYOFF_IN_PAST_SIX_MONTHS"),
-            'FOREIGN_WORKER_INFO_EDUCATION': st.session_state.user_info.get("FOREIGN_WORKER_INFO_EDUCATION"),
-            'FW_INFO_YR_REL_EDU_COMPLETED': st.session_state.user_info.get("FW_INFO_YR_REL_EDU_COMPLETED"),
-            'FW_INFO_REQ_EXPERIENCE': st.session_state.user_info.get("FW_INFO_REQ_EXPERIENCE")
-        }
+            # Define the new row as a dictionary to ensure it matches the column names
+            new_row = {
+                'NAICS': st.session_state.job_info.get("NAICS"),
+                'PW_LEVEL_9089': st.session_state.job_info.get("PW_LEVEL_9089"),
+                'PW_AMOUNT_9089': st.session_state.job_info.get("PW_AMOUNT_9089"),
+                'JOB_INFO_WORK_STATE': st.session_state.job_info.get("JOB_INFO_WORK_STATE"),
+                'COUNTRY_OF_CITIZENSHIP': st.session_state.user_info.get("COUNTRY_OF_CITIZENSHIP"),
+                'CLASS_OF_ADMISSION': st.session_state.user_info.get("CLASS_OF_ADMISSION"),
+                'EMPLOYER_NUM_EMPLOYEES': st.session_state.job_info.get("EMPLOYER_NUM_EMPLOYEES"),
+                'JOB_INFO_EDUCATION': st.session_state.job_info.get("JOB_INFO_EDUCATION"),
+                'JOB_INFO_TRAINING': st.session_state.job_info.get("JOB_INFO_TRAINING"),
+                'JOB_INFO_EXPERIENCE': st.session_state.job_info.get("JOB_INFO_EXPERIENCE"),
+                'JOB_INFO_EXPERIENCE_NUM_MONTHS': st.session_state.job_info.get("JOB_INFO_EXPERIENCE_NUM_MONTHS"),
+                'JOB_INFO_FOREIGN_ED': st.session_state.job_info.get("JOB_INFO_FOREIGN_ED"),
+                'RI_LAYOFF_IN_PAST_SIX_MONTHS': st.session_state.job_info.get("RI_LAYOFF_IN_PAST_SIX_MONTHS"),
+                'FOREIGN_WORKER_INFO_EDUCATION': st.session_state.user_info.get("FOREIGN_WORKER_INFO_EDUCATION"),
+                'FW_INFO_YR_REL_EDU_COMPLETED': st.session_state.user_info.get("FW_INFO_YR_REL_EDU_COMPLETED"),
+                'FW_INFO_REQ_EXPERIENCE': st.session_state.user_info.get("FW_INFO_REQ_EXPERIENCE")
+            }
 
-        # Append the new row to the DataFrame
-        new_row_df = pd.DataFrame([new_row])
-        # Concatenate the new row to the original DataFrame
-        combined_df1 = pd.concat([combined_df1, new_row_df], ignore_index=True)
-        # Number of rows in original dataframe
-        original_rows1 = original_df.shape[0]
-        # Create dummies for the combined dataframe
-        combined_df1['NAICS'] = combined_df1['NAICS'].astype(str)
-        combined_df1['PW_AMOUNT_9089'] = pd.to_numeric(combined_df1['PW_AMOUNT_9089'], errors='coerce')
-        cat_var = ['NAICS', 'PW_LEVEL_9089', 'JOB_INFO_WORK_STATE', 'COUNTRY_OF_CITIZENSHIP',
-                   'FOREIGN_WORKER_INFO_EDUCATION',
-                   'JOB_INFO_EXPERIENCE', 'CLASS_OF_ADMISSION', 'JOB_INFO_EDUCATION', 'JOB_INFO_TRAINING',
-                   'JOB_INFO_FOREIGN_ED', 'RI_LAYOFF_IN_PAST_SIX_MONTHS', 'FW_INFO_REQ_EXPERIENCE']
+            # Append the new row to the DataFrame
+            new_row_df = pd.DataFrame([new_row])
+            # Concatenate the new row to the original DataFrame
+            combined_df1 = pd.concat([combined_df1, new_row_df], ignore_index=True)
+            # Number of rows in original dataframe
+            original_rows1 = original_df.shape[0]
+            # Create dummies for the combined dataframe
+            combined_df1['NAICS'] = combined_df1['NAICS'].astype(str)
+            combined_df1['PW_AMOUNT_9089'] = pd.to_numeric(combined_df1['PW_AMOUNT_9089'], errors='coerce')
+            cat_var = ['NAICS', 'PW_LEVEL_9089', 'JOB_INFO_WORK_STATE', 'COUNTRY_OF_CITIZENSHIP',
+                       'FOREIGN_WORKER_INFO_EDUCATION',
+                       'JOB_INFO_EXPERIENCE', 'CLASS_OF_ADMISSION', 'JOB_INFO_EDUCATION', 'JOB_INFO_TRAINING',
+                       'JOB_INFO_FOREIGN_ED', 'RI_LAYOFF_IN_PAST_SIX_MONTHS', 'FW_INFO_REQ_EXPERIENCE']
 
-        combined_df_encoded1 = pd.get_dummies(combined_df1, columns=cat_var)
+            combined_df_encoded1 = pd.get_dummies(combined_df1, columns=cat_var)
 
-        # Split data into original and user input dataframes using row index
-        original_df_encoded1 = combined_df_encoded1[:original_rows1]
-        input_df_encoded1 = combined_df_encoded1.tail(1)
+            # Split data into original and user input dataframes using row index
+            original_df_encoded1 = combined_df_encoded1[:original_rows1]
+            input_df_encoded1 = combined_df_encoded1.tail(1)
 
-        # Using predict() with new data provided by the user
-        prediction_val = ada.predict(input_df_encoded1)
-        st.session_state['input_features'] = input_df_encoded1
+            st.session_state['input_features'] = input_df_encoded1
+            st.session_state['confidence'] = 90  # Default confidence
+            pred = ada.predict(input_df_encoded1)
+
+            y_pred, y_pis = mapie.predict(input_df_encoded1, alpha=abs((st.session_state['confidence']/100)-1))
+
+            st.session_state['prediction'] = pred[0]
+            st.session_state['low'] = y_pis[0, 0, 0] if y_pis[0, 0, 0] > 0 else 0
+            st.session_state['high'] = y_pis[0, 1, 0]
 
 
-        # Get prediction interval from MAPIE
-        y_pred, y_pis = mapie.predict(input_df_encoded1, alpha=0.1)
-        low_year, low_month = decimal_to_years_months(y_pis[0, 0, 0] if y_pis[0, 0, 0] > 0 else 0)
-        high_year, high_month = decimal_to_years_months(y_pis[0, 1, 0])
-        predict_year, predict_month = decimal_to_years_months(prediction_val[0])
+    predict_year, predict_month = decimal_to_years_months(st.session_state['prediction'])
+    low_year, low_month = decimal_to_years_months(st.session_state['low'])
+    high_year, high_month = decimal_to_years_months(st.session_state['high'])
 
-        st.markdown(f"""
-        **Our model predicts:**  
-        Your waiting time is estimated at **{predict_year}, {predict_month}** (with 90% confidence that your wait time will be between **{low_year}, {low_month}** and **{high_year}, {high_month}**).
-        """)
+    st.markdown(f"""
+        <div style="text-align: center; margin-top: 20px; margin-bottom: 20px;">
+            <p style="font-size: 18px; margin-bottom: 5px;">Our model predicts:</p>
+            <p style="font-size: 32px; color: green; font-weight: bold; margin: 10px 0;">
+                {predict_year}, {predict_month}
+            </p>
+            <p style="font-size: 18px; margin-top: 5px;">
+                With {st.session_state['confidence']}% confidence, the wait time will be between
+                <br><b>{low_year}, {low_month}</b> and <b>{high_year}, {high_month}</b>.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+    confidence = st.slider("Adjust the confidence interval?", 0, 100, st.session_state['confidence'], help="A confidence interval is a statistical range used to express the uncertainty or variability in a prediction. It provides a range of values within which we expect the true value to lie, with a specified level of confidence. For example, a 95% confidence interval suggests that, if the same experiment or analysis were repeated multiple times, 95% of the resulting intervals would contain the true value. A narrower confidence interval indicates greater precision in the prediction, while a wider interval reflects greater uncertainty. This allows for a more informed interpretation of the prediction's reliability.")
 
-        if st.button("Analyze Features"):
+    # Example data
+    lower_bound = st.session_state['low']
+    upper_bound = st.session_state['high']
+    final_prediction = st.session_state['prediction']
+    max_time = 12
+    fig, ax = plt.subplots(figsize=(8, 1))
+
+    ax.fill_between([lower_bound, upper_bound], 0, 1, color='green', alpha=0.3, label="Confidence Interval")
+    ax.axvline(final_prediction, color='red', lw=3, label='Final Prediction')
+
+    ax.set_xlim(0, max_time)
+    ax.set_ylim(0, 1)
+    ax.set_xlabel('Waiting Time (years)')
+    ax.set_yticks([])
+    ax.legend()
+    st.pyplot(fig)
+
+    col1, col2, col3 = st.columns([3, 2.5, 1])
+
+    with col1:
+        # 'Back' button on the left
+        if st.button("Back: Reinput Information"):
+            st.session_state.page = "job_info"
+            del st.session_state['prediction']
+            st.rerun()
+
+    with col3:
+        if st.button("Predict"):
+            with st.spinner("Predicting..."):
+                st.session_state['confidence'] = confidence
+                y_pred, y_pis = mapie.predict(st.session_state['input_features'],
+                                              alpha=abs((st.session_state['confidence'] / 100) - 1))
+                st.session_state['low'] = y_pis[0, 0, 0] if y_pis[0, 0, 0] > 0 else 0
+                st.session_state['high'] = y_pis[0, 1, 0]
+                st.rerun()
+
+    with col2:
+        # 'Analyze Features' button in the center
+        analyze_button = st.button("Analyze Features")
+        if analyze_button:
             filename = 'Streamlit/pages/immigrationpage1dot5.py'
             st.switch_page("./pages/immigrationpage1dot5.py")
             with open(filename) as f:
                 exec(f.read())
             updatePage()
             st.rerun()
-        if st.button("Back: Reinput Information"):
-            st.session_state.page = "job_info"
-            st.rerun()
+
+    # Custom CSS for making the 'Analyze Features' button green and adjusting text style
+    st.markdown("""
+        <style>
+            .css-1aumxhk {  /* Class for "Analyze Features" button */
+                color: green;
+                font-size: 20px;
+                font-weight: bold;
+            }
+        </style>
+    """, unsafe_allow_html=True)
 
 
 # --------------------
 # Main Navigation Logic
 # --------------------
-# Initialize session state if not already done
 if "page" not in st.session_state:
     st.session_state.page = "job_info"
 
 # Render the page based on the session state
 if st.session_state.page == "job_info":
-    job_info_page()
+    job_info_page1()
+if st.session_state.page == "job_info2":
+    job_info_page2()
 elif st.session_state.page == "user_info":
     user_info_page()
 elif st.session_state.page == "prediction":
