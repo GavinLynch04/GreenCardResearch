@@ -1,13 +1,11 @@
 import pickle
 import time
 
-import joblib
-import numpy as np
-from lime.lime_tabular import LimeTabularExplainer
-import shap
-from sklearn.metrics import classification_report, precision_score, recall_score, mean_absolute_error
-from sklearn.model_selection import train_test_split
+from skimage.metrics import mean_squared_error
+from sklearn.metrics import mean_absolute_error, r2_score
+from sklearn.model_selection import train_test_split, GridSearchCV, KFold
 from mapie.regression import MapieRegressor
+from tensorflow.python.ops.losses.losses_impl import mean_squared_error
 from xgboost import XGBClassifier, XGBRegressor
 
 from Data.Preprocessing.preprocess import *
@@ -37,49 +35,87 @@ xgb = bestXGB.fit(train_X, train_y)
 stop = time.time()
 print(f"Training time: {stop - start}s")
 
-with open("../Streamlit/pages/xgb_model.pkl", "wb") as file:
-    pickle.dump(xgb, file)
 
 y_pred = xgb.predict(test_X)
-mae = mean_absolute_error(test_y, y_pred)
+
+r2_score = r2_score(test_y, y_pred)
+mae = mean_squared_error(test_y, y_pred)
 print(f"MAE: {mae}")
-explainer = shap.TreeExplainer(bestXGB)
-with open("../Streamlit/pages/shap_xgb.pkl", "wb") as file:
-    pickle.dump(explainer, file)
+print(f"R2: {r2_score}")
 
-'''shap_pickle = open('../Streamlit/pages/xgboost_model.pkl', 'rb')
-xgb = pickle.load(shap_pickle)
-shap_pickle.close()'''
+print("\nSetting up base XGBoost Regressor with GPU support...")
+base_xgb = xgb.XGBRegressor(
+    objective='reg:squarederror',
+    tree_method='gpu_hist',
+    random_state=9,
 
-print("end")
-mapie = MapieRegressor(estimator=xgb, n_jobs=-1)  # 90% confidence interval
-mapie.fit(train_X, train_y)
-with open("../Streamlit/pages/mapieXGB.pkl", "wb") as file:
-    pickle.dump(mapie, file)
+    # Parameters from your original model that we *might* fix or tune:
+    subsample=0.8,                # Keep fixed for this example grid
+    colsample_bytree=0.8,         # Keep fixed for this example grid
+    gamma=0.1,                    # Keep fixed for this example grid
+    reg_alpha=0.1,                # Keep fixed for this example grid
+    reg_lambda=1                  # Keep fixed for this example grid
+)
 
-print("here")
-sample_indices = test_X.sample(n=1000, random_state=42).index  # Take random 1000 rows, get their indices
-test_X = test_X.loc[sample_indices]                      # Subset features
-test_y = test_y.loc[sample_indices]                      # Subset labels (use loc to match index)
+# 2. Define the parameter grid for GridSearchCV
+#    Focus on key tuning parameters around your initial values.
+#    Keep the grid relatively small initially due to dataset size.
+#    Expand later if needed and computationally feasible.
+param_grid = {
+    'max_depth': [5, 7, 10, 15],             # Test depths around your original 6
+    'learning_rate': [0.03, 0.05, 0.07], # Test rates around your original 0.05
+    'n_estimators': [400, 600],      # Test estimator counts around your 500
+    'min_child_weight': [1, 3, 5]    # Test values around your original 3
+    # Add more parameters here if desired, e.g.:
+    # 'subsample': [0.7, 0.8],
+    # 'colsample_bytree': [0.7, 0.8],
+    # 'gamma': [0.05, 0.1, 0.2],
+}
+print(f"Parameter grid for GridSearchCV: {param_grid}")
 
-print("here2")
-y_pred, y_pis = mapie.predict(test_X, alpha=0.1)
+# 3. Define the Cross-Validation strategy
+#    KFold is standard for regression. Shuffle is recommended.
+#    Using 3 folds is faster for large datasets.
+cv_strategy = KFold(n_splits=3, shuffle=True, random_state=42)
+print(f"CV strategy: {cv_strategy}")
 
-print("here3")
-print(test_y)
-correct = (test_y >= y_pis[:, 0, 0]) & (test_y <= y_pis[:, 1, 0])  # True if within the interval
-accuracy = np.mean(correct)
+# 4. Instantiate GridSearchCV
+#    n_jobs=-1 might not be as critical if GPU does the heavy lifting,
+#    but doesn't hurt. verbose=2 shows progress.
+grid_search = GridSearchCV(
+    estimator=base_xgb,
+    param_grid=param_grid,
+    cv=cv_strategy,
+    scoring='r2',       # Or 'neg_mean_absolute_error', 'neg_mean_squared_error'
+    n_jobs=-1,          # Use available cores for data handling/prep if needed
+    verbose=2           # Print progress updates
+)
 
-# Calculate custom precision and recall
-# Convert predictions into "correct" and "incorrect" categories
-binary_y_pred = correct.astype(int)  # 1 for correct, 0 for incorrect
-binary_y_true = np.ones_like(test_y)  # True labels are all "correct" (1)
+# --- Run Grid Search ---
+print("\nStarting GridSearchCV with XGBoost (GPU)... This may take time.")
+start_grid_search = time.time()
+grid_search.fit(train_X, train_y)
+end_grid_search = time.time()
+print(f"GridSearchCV Training time: {end_grid_search - start_grid_search:.4f}s")
 
-# Calculate precision and recall based on binary values
-precision = precision_score(binary_y_true, binary_y_pred)
-recall = recall_score(binary_y_true, binary_y_pred)
+# --- Results ---
+print("\n--- Grid Search Results ---")
+print(f"Best Parameters found: {grid_search.best_params_}")
+print(f"Best Cross-Validation R² score: {grid_search.best_score_:.4f}")
 
-# Display the results
-print(f"Custom Accuracy (within 90% confidence): {accuracy:.2f}")
-print(f"Custom Precision: {precision:.2f}")
-print(f"Custom Recall: {recall:.2f}")
+# --- Evaluate Best Model on Test Set ---
+print("\nEvaluating the best model found by GridSearchCV on the test set...")
+best_xgb_model = grid_search.best_estimator_ # The model refit with best params
+
+start_predict = time.time()
+y_pred = best_xgb_model.predict(test_X)
+end_predict = time.time()
+print(f"Prediction time on test set: {end_predict - start_predict:.4f}s")
+
+# Use the imported functions directly
+final_r2 = r2_score(test_y, y_pred)
+final_mse = mean_squared_error(test_y, y_pred) # Also calculate MSE
+
+print("\n--- Best Model Evaluation on Test Set ---")
+print(f"Test Set R-squared (R²): {final_r2:.4f}")
+print(f"Test Set Mean Squared Error (MSE): {final_mse:.4f}")
