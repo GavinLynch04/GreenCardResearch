@@ -44,9 +44,8 @@ print(f"MAE: {mae}")
 print(f"R2: {r2_score}")
 
 print("\nSetting up base XGBoost Regressor with GPU support...")
-base_xgb = xgb.XGBRegressor(
+base_xgb = XGBRegressor(
     objective='reg:squarederror',
-    tree_method='gpu_hist',
     random_state=9,
 
     # Parameters from your original model that we *might* fix or tune:
@@ -62,10 +61,10 @@ base_xgb = xgb.XGBRegressor(
 #    Keep the grid relatively small initially due to dataset size.
 #    Expand later if needed and computationally feasible.
 param_grid = {
-    'max_depth': [5, 7, 10, 15],             # Test depths around your original 6
-    'learning_rate': [0.03, 0.05, 0.07], # Test rates around your original 0.05
-    'n_estimators': [400, 600],      # Test estimator counts around your 500
-    'min_child_weight': [1, 3, 5]    # Test values around your original 3
+    'max_depth': [15, 20, 25, 30],             # Test depths around your original 6
+    'learning_rate': [0.07, 0.09, 0.11], # Test rates around your original 0.05
+    'n_estimators': [600],      # Test estimator counts around your 500
+    'min_child_weight': [1]    # Test values around your original 3
     # Add more parameters here if desired, e.g.:
     # 'subsample': [0.7, 0.8],
     # 'colsample_bytree': [0.7, 0.8],
