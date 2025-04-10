@@ -61,9 +61,9 @@ base_xgb = XGBRegressor(
 #    Keep the grid relatively small initially due to dataset size.
 #    Expand later if needed and computationally feasible.
 param_grid = {
-    'max_depth': [15, 20, 25, 30],             # Test depths around your original 6
-    'learning_rate': [0.07, 0.09, 0.11], # Test rates around your original 0.05
-    'n_estimators': [600, 800, 1000],      # Test estimator counts around your 500
+    'max_depth': [15],             # Test depths around your original 6
+    'learning_rate': [0.07], # Test rates around your original 0.05
+    'n_estimators': [1000, 1200, 1500],      # Test estimator counts around your 500
     'min_child_weight': [1]    # Test values around your original 3
     # Add more parameters here if desired, e.g.:
     # 'subsample': [0.7, 0.8],
