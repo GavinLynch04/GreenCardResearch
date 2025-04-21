@@ -124,7 +124,212 @@ def preprocess():
     # Prepare data for training
     X = df_combined.drop(columns=['MONTHS_TO_DECISION', 'WAITING_TIME', 'DECISION_DATE', 'CASE_RECEIVED_DATE', 'CHINA_DATE', 'INDIA_DATE','MEXICO_DATE','PHILIPPINES_DATE','ALL_DATE', 'WAITING_TIME_RANGE'])
     cat_var = ['NAICS', 'PW_LEVEL_9089', 'JOB_INFO_WORK_STATE', 'COUNTRY_OF_CITIZENSHIP', 'FOREIGN_WORKER_INFO_EDUCATION', 'JOB_INFO_EXPERIENCE', 'CLASS_OF_ADMISSION', 'JOB_INFO_EDUCATION', 'JOB_INFO_TRAINING', 'JOB_INFO_FOREIGN_ED', 'RI_LAYOFF_IN_PAST_SIX_MONTHS', 'FW_INFO_REQ_EXPERIENCE']
-    X_encoded = pd.get_dummies(X, columns=cat_var)
+    X_encoded = pd.get_dummies(X, columns=cat_var, dtype='int8')
+
+    return X_encoded, y
+
+
+import pandas as pd
+import numpy as np # Import numpy for vectorized operations
+# import torch # Keep torch import if used elsewhere
+
+def preprocess_optimized():
+    # --- 1. Load and Preprocess df_time ---
+    # Specify dtypes for potentially faster loading and less memory
+    time_dtypes = {
+        'MONTH': 'int16', 'YEAR': 'int16',
+        'CHINA MONTH': 'int16', 'CHINA YEAR': 'int16',
+        'INDIA MONTH': 'int16', 'INDIA YEAR': 'int16',
+        'MEXICO MONTH': 'int16', 'MEXICO YEAR': 'int16',
+        'PHILIPPINES MONTH': 'int16', 'PHILIPPINES YEAR': 'int16',
+        'ALL MONTH': 'int16', 'ALL YEAR': 'int16',
+    }
+    df_time = pd.read_csv(
+        "../Data/Data Sets/Processing Time Data.csv",
+        dtype=time_dtypes,
+        nrows=95 # Read only necessary rows (0 to 94)
+    )
+    # df_time = df_time.loc[:94] # Already handled by nrows
+
+    # Combine date creation - slightly cleaner
+    def create_date(year_col, month_col):
+        # Using .zfill(2) handles single-digit months correctly
+        return pd.to_datetime(
+            df_time[year_col].astype(str) + '-' + df_time[month_col].astype(str).str.zfill(2),
+            format='%Y-%m',
+            errors='coerce' # Handle potential errors gracefully
+        )
+
+    df_time['MONTH_YEAR'] = create_date('YEAR', 'MONTH')
+    df_time['CHINA_DATE'] = create_date('CHINA YEAR', 'CHINA MONTH')
+    df_time['INDIA_DATE'] = create_date('INDIA YEAR', 'INDIA MONTH')
+    df_time['MEXICO_DATE'] = create_date('MEXICO YEAR', 'MEXICO MONTH')
+    df_time['PHILIPPINES_DATE'] = create_date('PHILIPPINES YEAR', 'PHILIPPINES MONTH')
+    df_time['ALL_DATE'] = create_date('ALL YEAR', 'ALL MONTH')
+
+    # Drop original date components earlier
+    cols_to_drop_time = [
+        'MONTH','YEAR','CHINA MONTH','CHINA YEAR','INDIA MONTH','INDIA YEAR',
+        'MEXICO MONTH','MEXICO YEAR','PHILIPPINES MONTH','PHILIPPINES YEAR',
+        'ALL YEAR','ALL MONTH'
+    ]
+    df_time = df_time.drop(columns=cols_to_drop_time)
+    # Drop rows if MONTH_YEAR failed conversion
+    df_time.dropna(subset=['MONTH_YEAR'], inplace=True)
+
+
+    # --- 2. Load and Clean Main DataFrame (df) ---
+    # Consider specifying dtypes here too if known, especially for categorical/int
+    # Example: dtypes = {'NAICS': 'str', 'PW_AMOUNT_9089': 'float64', ...}
+    # df = pd.read_csv('../Data/Data Sets/fullData.csv', dtype=dtypes)
+    df = pd.read_csv('../Data/Data Sets/fullData.csv')
+
+    # Drop unused columns early (if the commented list is accurate)
+    # columns_to_drop_main = ['CASE_NO', 'CASE_STATUS', 'PW_SOC_CODE', ...]
+    # df.drop(columns=columns_to_drop_main, inplace=True, errors='ignore')
+
+    # --- Vectorized Salary Conversion (MUCH FASTER) ---
+    conversion_factors = {
+        'Bi-Weekly': 26,
+        'Hour': 2080,
+        'Month': 12,
+        'Week': 52,
+        'Year': 1 # Include 'Year' for completeness
+    }
+    # Ensure PW_AMOUNT is numeric first
+    df['PW_AMOUNT_9089'] = pd.to_numeric(df['PW_AMOUNT_9089'], errors='coerce')
+
+    # Map conversion factors, fill missing/non-matching units with 1 (no change)
+    unit_map = df['PW_UNIT_OF_PAY_9089'].map(conversion_factors).fillna(1)
+    df['PW_AMOUNT_9089'] *= unit_map
+
+    # Handle values under 1000 (vectorized)
+    under_1000_mask = (df['PW_AMOUNT_9089'] < 1000) & (df['PW_AMOUNT_9089'].notna())
+    df.loc[under_1000_mask, 'PW_AMOUNT_9089'] *= 1000
+
+    # Drop unit column after conversion
+    df.drop(columns=['PW_UNIT_OF_PAY_9089'], inplace=True)
+
+    # --- Other Cleaning Steps (mostly unchanged, already efficient) ---
+    state_replace = {'MASSACHUSETTES': 'MASSACHUSETTS', 'MH': 'MARSHALL ISLANDS'}
+    country_replace = {'IVORY COAST': "COTE d'IVOIRE", 'NETHERLANDS ANTILLES': 'NETHERLANDS'}
+    df['JOB_INFO_WORK_STATE'].replace(state_replace, inplace=True)
+    df['COUNTRY_OF_CITIZENSHIP'].replace(country_replace, inplace=True)
+
+    countries_to_drop = ['SOVIET UNION', 'UNITED STATES OF AMERICA']
+    df = df[~df['COUNTRY_OF_CITIZENSHIP'].isin(countries_to_drop)]
+
+    # --- Date Conversion and Alignment ---
+    df['CASE_RECEIVED_DATE'] = pd.to_datetime(df['CASE_RECEIVED_DATE'], errors='coerce')
+    df['DECISION_DATE'] = pd.to_datetime(df['DECISION_DATE'], errors='coerce')
+
+    # Create a month-start date column for merging
+    df['CASE_RECEIVED_MONTH_START'] = df['CASE_RECEIVED_DATE'].dt.to_period('M').dt.to_timestamp()
+
+    # --- Drop NA before Merge (Crucial Columns) ---
+    # Drop rows where key merge/calculation columns are missing
+    critical_cols_na = [
+        'CASE_RECEIVED_DATE', 'DECISION_DATE', 'CASE_RECEIVED_MONTH_START',
+        'COUNTRY_OF_CITIZENSHIP', 'PW_AMOUNT_9089' # Add others if critical
+    ]
+    df.dropna(subset=critical_cols_na, inplace=True)
+    # Consider dropping based on all columns if that was the original intent:
+    # df.dropna(axis=0, how='any', inplace=True) # Original behaviour
+
+    # --- 3. Single Merge ---
+    df_merged = pd.merge(
+        df,
+        df_time,
+        left_on='CASE_RECEIVED_MONTH_START',
+        right_on='MONTH_YEAR',
+        how='inner' # Keep only rows that match a processing time entry
+    )
+    # We can drop merge keys if no longer needed
+    # df_merged.drop(columns=['MONTH_YEAR', 'CASE_RECEIVED_MONTH_START'], inplace=True)
+
+
+    # --- 4. Vectorized Waiting Time Calculation ---
+    # Define conditions based on country
+    cond_china = df_merged['COUNTRY_OF_CITIZENSHIP'] == 'CHINA'
+    cond_india = df_merged['COUNTRY_OF_CITIZENSHIP'] == 'INDIA'
+    cond_mexico = df_merged['COUNTRY_OF_CITIZENSHIP'] == 'MEXICO'
+    cond_philippines = df_merged['COUNTRY_OF_CITIZENSHIP'] == 'PHILIPPINES'
+
+    # Define corresponding date columns from df_time
+    date_choices = [
+        df_merged['CHINA_DATE'],
+        df_merged['INDIA_DATE'],
+        df_merged['MEXICO_DATE'],
+        df_merged['PHILIPPINES_DATE'],
+    ]
+
+    # Use np.select to pick the correct date based on country
+    # Default to 'ALL_DATE' if none of the specific countries match
+    correct_processing_date = np.select(
+        [cond_china, cond_india, cond_mexico, cond_philippines],
+        date_choices,
+        default=df_merged['ALL_DATE']
+    )
+
+    # Calculate waiting time in approximate months
+    # Ensure the result of np.select is treated as datetime
+    df_merged['WAITING_TIME'] = (df_merged['DECISION_DATE'] - pd.to_datetime(correct_processing_date)).dt.days // 30
+
+    # Drop rows where waiting time calculation failed (e.g., date issues)
+    df_merged.dropna(subset=['WAITING_TIME'], inplace=True)
+
+    # --- 5. Prepare Target Variable (y) and Features (X) ---
+
+    # Regression Target
+    y = df_merged['WAITING_TIME'] / 12
+
+    # Classification Target (Optional - uncomment if needed)
+    # waiting_time_ranges = [(0, 30), (30, 60), (60, 120), (120, float('inf'))]
+    # waiting_time_labels = ['0-2.5 years', '2.5-5 years', '5-10 years', '>10 years']
+    # def categorize_waiting_time(waiting_time):
+    #     for i, (start, end) in enumerate(waiting_time_ranges):
+    #         if start <= waiting_time < end:
+    #             return waiting_time_labels[i]
+    #     return waiting_time_labels[-1] # Handle edge case or NaN if necessary
+    # df_merged['WAITING_TIME_RANGE'] = df_merged['WAITING_TIME'].apply(categorize_waiting_time)
+    # y_classification = df_merged['WAITING_TIME_RANGE']
+
+
+    # Define columns to drop for features X
+    # Includes intermediate dates, merge keys, target, etc.
+    columns_to_drop_final = [
+        'WAITING_TIME', 'DECISION_DATE', 'CASE_RECEIVED_DATE',
+        'CASE_RECEIVED_MONTH_START', 'MONTH_YEAR', # Merge keys
+        'CHINA_DATE', 'INDIA_DATE', 'MEXICO_DATE', 'PHILIPPINES_DATE', 'ALL_DATE', # Dates from df_time
+        # 'WAITING_TIME_RANGE', # Drop if classification target isn't needed elsewhere
+        # 'MONTHS_TO_DECISION' # This wasn't calculated in this version
+    ]
+    X = df_merged.drop(columns=columns_to_drop_final, errors='ignore')
+
+    # Rename NAICS column if it exists after merge (check actual name)
+    if '2_NAICS' in X.columns:
+         X.rename(columns={'2_NAICS': 'NAICS'}, inplace=True)
+    elif 'NAICS_x' in X.columns: # Handle potential merge suffixes
+         X.rename(columns={'NAICS_x': 'NAICS'}, inplace=True)
+
+    # --- 6. One-Hot Encode ---
+    cat_var = [
+        'NAICS', 'PW_LEVEL_9089', 'JOB_INFO_WORK_STATE', 'COUNTRY_OF_CITIZENSHIP',
+        'FOREIGN_WORKER_INFO_EDUCATION', 'JOB_INFO_EXPERIENCE', 'CLASS_OF_ADMISSION',
+        'JOB_INFO_EDUCATION', 'JOB_INFO_TRAINING', 'JOB_INFO_FOREIGN_ED',
+        'RI_LAYOFF_IN_PAST_SIX_MONTHS', 'FW_INFO_REQ_EXPERIENCE'
+    ]
+    # Ensure only columns present in X are used for encoding
+    cat_var_present = [col for col in cat_var if col in X.columns]
+
+    # Use int8 for memory efficiency. sparse=True could save more memory
+    # but might require changes in downstream model handling (PyTorch usually needs dense)
+    X_encoded = pd.get_dummies(X, columns=cat_var_present, dtype='int8') # sparse=False (default)
+
+    print(f"Optimized preprocessing complete.")
+    print(f"X_encoded shape: {X_encoded.shape}")
+    print(f"X_encoded memory usage: {X_encoded.memory_usage(deep=True).sum() / (1024**2):.2f} MB")
+    print(f"y length: {len(y)}")
 
     return X_encoded, y
 

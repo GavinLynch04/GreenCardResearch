@@ -1,15 +1,15 @@
 import time
 
 import pandas as pd
-from skimage.metrics import mean_squared_error
-from sklearn.metrics import classification_report, r2_score
+from sklearn.metrics import r2_score, root_mean_squared_error
 from sklearn.model_selection import train_test_split, GridSearchCV, KFold
-from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
+from sklearn.tree import DecisionTreeRegressor
 
 pd.set_option('display.max_columns', None)
 from Data.Preprocessing.preprocess import *
 
 X, y = preprocess()
+print(X.shape)
 train_X, test_X, train_y, test_y = train_test_split(X, y, test_size=0.25, random_state=27)
 
 
@@ -18,7 +18,7 @@ bestClassTree = DecisionTreeRegressor(max_depth=None, max_features=None, min_sam
 bestClassTree.fit(train_X, train_y)
 y_pred = bestClassTree.predict(test_X)
 print("R2 for old best: " + str(r2_score(test_y, y_pred)))
-print("MSE for old best: " + str(mean_squared_error(test_y, y_pred)))
+print("RMSE for old best: " + str(root_mean_squared_error(test_y, y_pred)))
 
 
 tree_reg = DecisionTreeRegressor(random_state=9)
@@ -38,7 +38,7 @@ param_grid = {
 # 3. Define the Cross-Validation strategy
 #    KFold is standard for regression. Shuffle is recommended.
 #    Using 3 or 5 folds is common. 3 folds will be faster.
-cv_strategy = KFold(n_splits=3, shuffle=True, random_state=42)
+cv_strategy = KFold(n_splits=5, shuffle=True, random_state=42)
 
 # 4. Instantiate GridSearchCV
 #    n_jobs=-1 uses all available CPU cores. verbose=2 shows progress.
@@ -51,9 +51,9 @@ grid_search = GridSearchCV(
     estimator=tree_reg,
     param_grid=param_grid,
     cv=cv_strategy,
-    scoring='r2',
-    n_jobs=-1, # USE ALL AVAILABLE CORES!
-    verbose=2  # Print progress updates
+    scoring='neg_root_mean_squared_error',
+    n_jobs=-1,
+    verbose=2
 )
 
 # --- Run Grid Search ---
@@ -77,9 +77,9 @@ test_predictions = best_tree_model.predict(test_X)
 end_predict = time.time()
 print(f"Prediction time on test set: {end_predict - start_predict:.4f}s")
 
-test_mse = mean_squared_error(test_y, test_predictions)
+test_rmse = root_mean_squared_error(test_y, test_predictions)
 test_r2 = r2_score(test_y, test_predictions)
 
 print("\n--- Best Model Evaluation on Test Set ---")
-print(f"Test Set Mean Squared Error (MSE): {test_mse:.4f}")
+print(f"Test Set Root Mean Squared Error (RMSE): {test_rmse:.4f}")
 print(f"Test Set R-squared (R²): {test_r2:.4f}")

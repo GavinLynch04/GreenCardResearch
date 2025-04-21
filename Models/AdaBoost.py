@@ -5,7 +5,8 @@ import joblib
 import numpy as np
 from lime.lime_tabular import LimeTabularExplainer
 import shap
-from sklearn.metrics import classification_report, precision_score, recall_score, mean_squared_error, r2_score
+from sklearn.metrics import classification_report, precision_score, recall_score, mean_squared_error, r2_score, \
+    root_mean_squared_error
 from sklearn.model_selection import train_test_split, GridSearchCV, KFold
 from mapie.regression import MapieRegressor
 from Data.Preprocessing.preprocess import *
@@ -20,17 +21,17 @@ end = time.time()
 
 train_X, test_X, train_y, test_y = train_test_split(X, y, test_size=0.25, random_state=207)
 
-bestAda = AdaBoostRegressor(estimator =  DecisionTreeRegressor(max_depth=68, min_samples_leaf=2, min_samples_split=13, random_state=9), n_estimators=50, learning_rate=0.01, random_state = 9)
+bestAda = AdaBoostRegressor(estimator =  DecisionTreeRegressor(max_depth=68, min_samples_leaf=2, min_samples_split=13, random_state=9), n_estimators=100, learning_rate=0.01, random_state = 9)
 start = time.time()
 ada = bestAda.fit(train_X, train_y)
 stop = time.time()
 print(f"Training time: {stop - start}s")
 y_pred = bestAda.predict(test_X)
-test_mse = mean_squared_error(test_y, y_pred)
+test_rmse = root_mean_squared_error(test_y, y_pred)
 test_r2 = r2_score(test_y, y_pred)
 
 print("\n--- Old Best Model Evaluation on Test Set ---")
-print(f"Test Set Mean Squared Error (MSE): {test_mse:.4f}")
+print(f"Test Set Root Mean Squared Error (RMSE): {test_rmse:.4f}")
 print(f"Test Set R-squared (R²): {test_r2:.4f}")
 
 
@@ -63,7 +64,7 @@ grid_search = GridSearchCV(
     estimator=ada_reg,
     param_grid=param_grid,
     cv=cv_strategy,
-    scoring='r2', # Or 'neg_mean_squared_error', etc.
+    scoring='neg_root_mean_squared_error', # Or 'neg_mean_squared_error', etc.
     n_jobs=-1,
     verbose=2
 )
@@ -81,7 +82,7 @@ print(f"Best Parameters found: {grid_search.best_params_}")
 print(f"Best Cross-Validation R² score: {grid_search.best_score_:.4f}")
 
 # --- Evaluate Best Model on Test Set ---
-best_ada_model = grid_search.best_estimator_ # This is the model with the best params
+best_ada_model = grid_search.best_estimator_
 
 test_predictions = best_ada_model.predict(test_X)
 test_mse = mean_squared_error(test_y, test_predictions)

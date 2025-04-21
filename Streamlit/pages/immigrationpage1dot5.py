@@ -231,7 +231,7 @@ if input_df_encoded1 is not None:
 
             alpha = min(1.0, 0.15 + 0.70 * (abs(shap_value) / max_abs_shap))
 
-            text_color = '#FFFFFF' if alpha < 0.55 else '#333333'
+            text_color = '#333333'
 
             if shap_value > 0:
                 background_color = f'rgba(255, 180, 180, {alpha:.2f})'
