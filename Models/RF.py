@@ -2,6 +2,10 @@ import time
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
+from xgboost import XGBRegressor
+import time
+from sklearn.metrics import r2_score, root_mean_squared_error
+from sklearn.model_selection import GridSearchCV, KFold
 from Data.Preprocessing.preprocess import *
 
 X, y = preprocess()
@@ -15,24 +19,54 @@ mtry = int(np.ceil(mtry_fraction * num_predictors))
 bestClassForest = RandomForestRegressor(max_depth=105, min_samples_leaf=2, min_samples_split=2,
                       random_state=9, n_jobs=-1)
 
-bestClassForest2 = RandomForestRegressor(max_features=mtry, max_depth=105, min_samples_leaf=2, min_samples_split=2, random_state=9, n_jobs=-1)
+bestXGB = XGBRegressor (
+max_depth=15, learning_rate=0.07, n_estimators=1000, gamma=0.1, min_child_weight=1, subsample=0.8, colsample_bytree=0.8,
+reg_alpha=0.1, reg_lambda=1,
+random_state=9, nthread=8)
+
+potential_xgb = XGBRegressor(
+    # Core Boosting Parameters
+    n_estimators=1500,         # Start high, use early stopping
+    learning_rate=0.03,        # Relatively low learning rate for robustness
+    objective='reg:squarederror', # Standard for regression
+
+    # Tree Complexity & Regularization (Inspired by RF)
+    max_depth=10,              # Moderately deep for XGBoost (RF's 105 is extreme)
+                               # XGB doesn't usually need *that* deep due to boosting
+    min_child_weight=1,        # Low value, allows splits on smaller groups (like RF's min_samples)
+    gamma=0.2,                 # Minimum loss reduction for split (slight regularization)
+
+    # Subsampling (Adds Randomness like RF Bagging)
+    subsample=0.8,             # Use 80% of data per tree
+    colsample_bytree=0.7,      # Use 70% of features per tree
+
+    # Regularization (L1/L2)
+    reg_alpha=0.01,            # Small L1 regularization
+    reg_lambda=1.0,            # Standard L2 regularization
+
+    # Other Parameters
+    random_state=9,            # For reproducibility (match RF if desired)
+    n_jobs=-1                  # Use all available CPU cores
+)
+
+potential_xgb.fit(train_X, train_y)
+y_pred3 = potential_xgb.predict(test_X)
 
 start = time.time()            # Start Time
 forest = bestClassForest.fit(train_X, train_y)
 stop = time.time()             # End Time
 print(f"Training time: {stop - start}s")
-forest2 = bestClassForest2.fit(train_X, train_y)
+forest2 = bestXGB.fit(train_X, train_y)
 y_pred = bestClassForest.predict(test_X)
-y_pred2 = bestClassForest2.predict(test_X)
-import time
-from sklearn.metrics import r2_score, root_mean_squared_error
-from sklearn.model_selection import GridSearchCV, KFold
+y_pred2 = bestXGB.predict(test_X)
+
 
 print("R2 for old best: " + str(r2_score(test_y, y_pred)))
 print("RMSE for old best: " + str(root_mean_squared_error(test_y, y_pred)))
-print("R2 for old best2: " + str(r2_score(test_y, y_pred2)))
-print("RMSE for old best2: " + str(root_mean_squared_error(test_y, y_pred2)))
-
+print("R2 for best XGB: " + str(r2_score(test_y, y_pred2)))
+print("RMSE for best XGB: " + str(root_mean_squared_error(test_y, y_pred2)))
+print("R2 for new XGB: " + str(r2_score(test_y, y_pred3)))
+print("RMSE for new XGB: " + str(root_mean_squared_error(test_y, y_pred3)))
 
 tree_reg = RandomForestRegressor(random_state=9)
 

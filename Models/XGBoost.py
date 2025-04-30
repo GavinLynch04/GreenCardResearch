@@ -17,7 +17,7 @@ total_memory_deep = X.memory_usage(deep=True).sum()
 print(f"\nTotal memory usage (deep): {total_memory_deep/1024/1024} MB")
 print(y)
 
-train_X, test_X, train_y, test_y = train_test_split(X, y, test_size=0.25, random_state=207)
+train_X, test_X, train_y, test_y = train_test_split(X, y, test_size=0.25, random_state=27)
 
 '''bestXGB = XGBRegressor(
     max_depth=15,                    # Controls tree depth, 3-10 is typical
@@ -45,11 +45,15 @@ print(xgb.feature_importances_)
 
 
 y_pred = xgb.predict(test_X)
+y_train_pred = xgb.predict(train_X)
 
-r2_score = r2_score(test_y, y_pred)
+r2_sc = r2_score(test_y, y_pred)
+r2 = r2_score(train_y, y_train_pred)
 rmse = root_mean_squared_error(test_y, y_pred)
-print(f"RMSE: {rmse}")
-print(f"R2: {r2_score}")
+print(f"Test RMSE: {rmse}")
+print(f"Train R2: {r2_sc}")
+print(f"Train RMSE: {root_mean_squared_error(train_y, y_train_pred)}")
+print(f"Train R2: {r2}")
 
 print("\nSetting up base XGBoost Regressor with GPU support...")
 base_xgb = XGBRegressor(

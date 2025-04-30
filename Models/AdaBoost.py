@@ -19,7 +19,7 @@ X, y = preprocess()
 end = time.time()
 
 
-train_X, test_X, train_y, test_y = train_test_split(X, y, test_size=0.25, random_state=207)
+train_X, test_X, train_y, test_y = train_test_split(X, y, test_size=0.25, random_state=27)
 
 bestAda = AdaBoostRegressor(estimator =  DecisionTreeRegressor(max_depth=68, min_samples_leaf=2, min_samples_split=13, random_state=9), n_estimators=100, learning_rate=0.01, random_state = 9)
 start = time.time()
@@ -27,12 +27,15 @@ ada = bestAda.fit(train_X, train_y)
 stop = time.time()
 print(f"Training time: {stop - start}s")
 y_pred = bestAda.predict(test_X)
+y_pred_train = bestAda.predict(train_X)
 test_rmse = root_mean_squared_error(test_y, y_pred)
 test_r2 = r2_score(test_y, y_pred)
 
 print("\n--- Old Best Model Evaluation on Test Set ---")
 print(f"Test Set Root Mean Squared Error (RMSE): {test_rmse:.4f}")
 print(f"Test Set R-squared (R²): {test_r2:.4f}")
+print(f"Train Set Root Mean Squared Error (RMSE): {root_mean_squared_error(train_y, y_pred_train):.4f}")
+print(f"Train Set R-squared : {r2_score(train_y, y_pred_train):.4f}")
 
 
 base_estimator = DecisionTreeRegressor(random_state=9)

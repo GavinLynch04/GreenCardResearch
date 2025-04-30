@@ -1,10 +1,10 @@
-from sklearn.metrics import accuracy_score, classification_report
+from sklearn.metrics import accuracy_score, classification_report, r2_score, root_mean_squared_error
 from sklearn.model_selection import train_test_split
 from Data.Preprocessing.preprocess import *
 from catboost import CatBoostClassifier, CatBoostRegressor
 
 X, y, cat = preprocess()
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=27)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=27)
 
 model = CatBoostRegressor(
     iterations=700,          # Number of boosting iterations
@@ -42,7 +42,10 @@ print("Best Parameters:", grid_search.best_params_)'''
 model.fit(X_train, y_train, eval_set=(X_test, y_test), plot=True)
 
 y_pred = model.predict(X_test)
+y_pred_train = model.predict(X_train)
 
 
-print("Accuracy:", accuracy_score(y_test, y_pred))
-print(classification_report(y_test, y_pred))
+print("R2 Test:", r2_score(y_test, y_pred))
+print("RMSE Test: " + root_mean_squared_error(y_test, y_pred))
+print("R2 Train:", r2_score(y_train, y_pred_train))
+print("RMSE Train: " + root_mean_squared_error(y_train, y_pred_train))

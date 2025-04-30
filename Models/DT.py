@@ -17,9 +17,11 @@ bestClassTree = DecisionTreeRegressor(max_depth=None, max_features=None, min_sam
                       random_state=9)
 bestClassTree.fit(train_X, train_y)
 y_pred = bestClassTree.predict(test_X)
+y_pred_train = bestClassTree.predict(train_X)
 print("R2 for old best: " + str(r2_score(test_y, y_pred)))
 print("RMSE for old best: " + str(root_mean_squared_error(test_y, y_pred)))
-
+print("R2 for train set: " + str(r2_score(train_y, y_pred_train)))
+print("RMSE for train set: " + str(root_mean_squared_error(train_y, y_pred_train)))
 
 tree_reg = DecisionTreeRegressor(random_state=9)
 
