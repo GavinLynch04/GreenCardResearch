@@ -58,20 +58,53 @@ def job_info_page1():
                                                 'WISCONSIN', 'WYOMING'])
     PW_LEVEL_9089 = st.selectbox('Prevailing Wage Level', options=['Level I', 'Level II', 'Level III', 'Level IV'])
     PW_AMOUNT_9089 = st.number_input("Prevailing Wage Amount (Annual salary)", min_value=0)
-    NAICS = st.selectbox('Employer NAICS Code (If unknown, refer to FAQs page for NAICS Code table.)',
-                         options=['11', '21', '22', '23', '31', '32', '33', '42', '44', '45', '48', '49', '51', '52',
-                                  '53', '54', '55', '56', '61', '62', '71', '72', '81', '92'])
+    NAICS_MAP = {
+        "11": "Agriculture, Forestry, Fishing and Hunting",
+        "21": "Mining, Quarrying, and Oil and Gas Extraction",
+        "22": "Utilities",
+        "23": "Construction",
+        "31": "Manufacturing",
+        "32": "Manufacturing",
+        "33": "Manufacturing",
+        "42": "Wholesale Trade",
+        "44": "Retail Trade",
+        "45": "Retail Trade",
+        "48": "Transportation and Warehousing",
+        "49": "Transportation and Warehousing",
+        "51": "Information",
+        "52": "Finance and Insurance",
+        "53": "Real Estate and Rental and Leasing",
+        "54": "Professional, Scientific, and Technical Services",
+        "55": "Management of Companies and Enterprises",
+        "56": "Administrative and Support and Waste Management and Remediation Services",
+        "61": "Educational Services",
+        "62": "Health Care and Social Assistance",
+        "71": "Arts, Entertainment, and Recreation",
+        "72": "Accommodation and Food Services",
+        "81": "Other Services (except Public Administration)",
+        "92": "Public Administration"
+    }
+
+    # Create formatted options for the selectbox: "CODE - DESCRIPTION"
+    NAICS_OPTIONS_FORMATTED = [f"{code} - {desc}" for code, desc in NAICS_MAP.items()]
+    selected_naics_formatted = st.selectbox(
+        'Employer NAICS Code',
+        options=NAICS_OPTIONS_FORMATTED
+    )
     JOB_INFO_EDUCATION = st.selectbox('Education level required by job:',
                                       options=["Master's", "Bachelor's", 'Doctorate', 'Other', 'High School',
                                                "Associate's"])
 
     if st.button("Next: Continue to Job Info"):
         # Store job info in session state
+        naics_code_only = None
+        if selected_naics_formatted:
+            naics_code_only = selected_naics_formatted.split(" - ")[0]
         st.session_state.job_info = {
             "JOB_INFO_WORK_STATE": JOB_INFO_WORK_STATE,
             "PW_LEVEL_9089": PW_LEVEL_9089,
             "PW_AMOUNT_9089": PW_AMOUNT_9089,
-            "NAICS": NAICS,
+            "NAICS": naics_code_only,
             "JOB_INFO_EDUCATION": JOB_INFO_EDUCATION,
         }
         st.session_state.page = "job_info2"
