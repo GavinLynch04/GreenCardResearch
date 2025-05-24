@@ -5,7 +5,6 @@ from skimage.metrics import mean_squared_error
 from sklearn.metrics import mean_absolute_error, r2_score, root_mean_squared_error
 from sklearn.model_selection import train_test_split, GridSearchCV, KFold
 from mapie.regression import MapieRegressor
-from tensorflow.python.ops.losses.losses_impl import mean_squared_error
 from xgboost import XGBClassifier, XGBRegressor
 
 from Data.Preprocessing.preprocess import *
@@ -60,9 +59,6 @@ base_xgb = XGBRegressor(
     random_state=9,
 
     # Parameters from your original model that we *might* fix or tune:
-    subsample=0.8,                # Keep fixed for this example grid
-    colsample_bytree=0.8,         # Keep fixed for this example grid
-    gamma=0.1,                    # Keep fixed for this example grid
     reg_alpha=0.1,                # Keep fixed for this example grid
     reg_lambda=1                  # Keep fixed for this example grid
 )
@@ -74,19 +70,19 @@ base_xgb = XGBRegressor(
 param_grid = {
     'max_depth': [15],             # Test depths around your original 6
     'learning_rate': [0.07], # Test rates around your original 0.05
-    'n_estimators': [1000],      # Test estimator counts around your 500
-    'min_child_weight': [1]    # Test values around your original 3
+    'n_estimators': [1000],  # Test estimator counts around your 500
+    'min_child_weight': [1],    # Test values around your original 3
     # Add more parameters here if desired, e.g.:
-    # 'subsample': [0.7, 0.8],
-    # 'colsample_bytree': [0.7, 0.8],
-    # 'gamma': [0.05, 0.1, 0.2],
+     'subsample': [1],
+     'colsample_bytree': [0.8],
+     'gamma': [0],
 }
 print(f"Parameter grid for GridSearchCV: {param_grid}")
 
 # 3. Define the Cross-Validation strategy
 #    KFold is standard for regression. Shuffle is recommended.
 #    Using 3 folds is faster for large datasets.
-cv_strategy = KFold(n_splits=5, shuffle=True, random_state=42)
+cv_strategy = KFold(n_splits=3, shuffle=True, random_state=42)
 print(f"CV strategy: {cv_strategy}")
 
 # 4. Instantiate GridSearchCV
