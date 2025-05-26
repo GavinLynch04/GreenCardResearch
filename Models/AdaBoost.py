@@ -47,10 +47,10 @@ ada_reg = AdaBoostRegressor(estimator=base_estimator, random_state=9)
 #    Note: Parameters for the base_estimator are prefixed with 'estimator__'
 #    Adjust these ranges based on your computational budget and prior knowledge
 param_grid = {
-    'n_estimators': [50, 100, 200],
-    'learning_rate': [0.01, 0.1, 0.5, 1.0],
-    'estimator__max_depth': [5, 10, 20, None], # None means nodes expand until pure or min_samples
-    'estimator__min_samples_split': [2, 5, 10, 13],
+    'n_estimators': [50, 100],
+    'learning_rate': [0.01, 0.1, 0.5],
+    'estimator__max_depth': [10, 20, None], # None means nodes expand until pure or min_samples
+    'estimator__min_samples_split': [5, 10, 13],
     'estimator__min_samples_leaf': [1, 2, 5]
 }
 

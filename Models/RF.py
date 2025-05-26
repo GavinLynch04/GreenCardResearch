@@ -73,7 +73,7 @@ tree_reg = RandomForestRegressor(random_state=9)
 param_grid = {
     'max_depth': [None], # None allows full growth, start limited
     'n_estimators': [100, 200, 300],
-    'min_samples_split': [30], # Increase minimums for large N
+    'min_samples_split': [4], # Increase minimums for large N
     'min_samples_leaf': [3],   # Increase minimums for large N
     'max_features': [None] # 'sqrt', fraction, or all features
     # 'criterion': ['squared_error', 'friedman_mse', 'absolute_error'] # If you want to test criteria
